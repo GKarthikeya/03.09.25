@@ -4,8 +4,8 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
+from webdriver_manager.chrome import ChromeDriverManager
+import time
 import re
 
 COLLEGE_LOGIN_URL = "https://samvidha.iare.ac.in/"
@@ -14,14 +14,14 @@ ATTENDANCE_URL = "https://samvidha.iare.ac.in/home?action=course_content"
 
 def create_driver():
     chrome_options = Options()
-    chrome_options.add_argument("--headless=new")  # ✅ required for Render
+    chrome_options.add_argument("--headless=new")  # ✅ Render requires headless
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-gpu")
     chrome_options.add_argument("--window-size=1920,1080")
 
-    # ✅ Use fixed chromedriver installed in Dockerfile
-    service = Service("/usr/local/bin/chromedriver")
+    # ✅ Use webdriver_manager so Render installs ChromeDriver dynamically
+    service = Service(ChromeDriverManager().install())
     driver = webdriver.Chrome(service=service, options=chrome_options)
     return driver
 
@@ -93,30 +93,32 @@ def login_and_get_attendance(username, password):
     driver = create_driver()
     try:
         driver.get(COLLEGE_LOGIN_URL)
-
-        # Wait for login form
-        WebDriverWait(driver, 10).until(
-            EC.presence_of_element_located((By.ID, "txt_uname"))
-        )
+        time.sleep(2)
 
         # Fill login form
         driver.find_element(By.ID, "txt_uname").send_keys(username)
         driver.find_element(By.ID, "txt_pwd").send_keys(password)
         driver.find_element(By.ID, "but_submit").click()
+        time.sleep(5)  # wait longer for login to process
 
-        # Wait until login completes and dashboard loads
-        WebDriverWait(driver, 10).until(
-            EC.url_contains("home")
-        )
+        # 🔍 Debugging info (goes to Render logs)
+        print("After login, URL:", driver.current_url)
+        print("Page source length:", len(driver.page_source))
+
+        # Check if still on login page (failed login)
+        if "login" in driver.current_url.lower() or "Invalid username or password" in driver.page_source:
+            return {
+                "overall": {
+                    "success": False,
+                    "message": "Login failed. Please check your credentials."
+                }
+            }
 
         # Navigate to attendance page
         driver.get(ATTENDANCE_URL)
+        time.sleep(3)
 
-        # Wait for attendance table
-        rows = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located((By.TAG_NAME, "tr"))
-        )
-
+        rows = driver.find_elements(By.TAG_NAME, "tr")
         return calculate_attendance_percentage(rows)
 
     except Exception as e:
