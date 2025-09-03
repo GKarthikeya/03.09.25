@@ -34,9 +34,30 @@
 </head>
 <body>
     <h2>📊 Attendance Report</h2>
-    
-    {{ table_html | safe }}
-    
+
+    <table>
+        <tr>
+            <th>S.No</th>
+            <th>Course Code</th>
+            <th>Course Name</th>
+            <th>Present</th>
+            <th>Absent</th>
+            <th>Percentage</th>
+            <th>Status</th>
+        </tr>
+        {% for row in table_data %}
+        <tr>
+            <td>{{ row.sno }}</td>
+            <td>{{ row.code }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.present }}</td>
+            <td>{{ row.absent }}</td>
+            <td>{{ row.percentage }}%</td>
+            <td>{{ row.status }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
     <div class="summary">
         <p>✅ Overall Attendance: Present = {{ overall.present }}, Absent = {{ overall.absent }}, Percentage = {{ overall.percentage }}%</p>
 
