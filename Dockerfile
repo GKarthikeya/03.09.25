@@ -32,10 +32,10 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy your app (rename "grok" to your folder name)
-COPY ./grok /app
+# Copy all project files (instead of missing "grok")
+COPY . /app
 
-# Expose port if needed (optional)
+# Expose port (Render expects 10000 by default)
 EXPOSE 10000
 
 # Start the Flask app with Gunicorn
