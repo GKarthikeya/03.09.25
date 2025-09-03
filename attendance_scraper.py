@@ -99,7 +99,20 @@ def login_and_get_attendance(username, password):
         driver.find_element(By.ID, "txt_uname").send_keys(username)
         driver.find_element(By.ID, "txt_pwd").send_keys(password)
         driver.find_element(By.ID, "but_submit").click()
-        time.sleep(3)
+        time.sleep(5)  # wait longer for login to process
+
+        # 🔍 Debugging info (goes to Render logs)
+        print("After login, URL:", driver.current_url)
+        print("Page source length:", len(driver.page_source))
+
+        # Check if still on login page (failed login)
+        if "login" in driver.current_url.lower() or "Invalid username or password" in driver.page_source:
+            return {
+                "overall": {
+                    "success": False,
+                    "message": "Login failed. Please check your credentials."
+                }
+            }
 
         # Navigate to attendance page
         driver.get(ATTENDANCE_URL)
