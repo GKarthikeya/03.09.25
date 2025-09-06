@@ -1,6 +1,6 @@
 FROM python:3.10-slim
 
-# Install system dependencies and Chrome dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
     wget unzip curl gnupg2 ca-certificates fonts-liberation \
     libnss3 libxss1 libasound2 libatk-bridge2.0-0 libgtk-3-0 \
@@ -14,9 +14,10 @@ RUN wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | gpg --dearm
     apt-get update && apt-get install -y google-chrome-stable && \
     rm -rf /var/lib/apt/lists/*
 
-# Install matching ChromeDriver
-ENV CHROMEDRIVER_VERSION=114.0.5735.90
-RUN wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${CHROMEDRIVER_VERSION}/chromedriver_linux64.zip" && \
+# Install matching ChromeDriver automatically
+RUN CHROME_VERSION=$(google-chrome --version | awk '{print $3}') && \
+    DRIVER_VERSION=$(wget -qO- "https://chromedriver.storage.googleapis.com/LATEST_RELEASE_${CHROME_VERSION%%.*}") && \
+    wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/${DRIVER_VERSION}/chromedriver_linux64.zip" && \
     unzip /tmp/chromedriver.zip -d /usr/local/bin/ && \
     chmod +x /usr/local/bin/chromedriver && \
     rm /tmp/chromedriver.zip
@@ -24,19 +25,20 @@ RUN wget -O /tmp/chromedriver.zip "https://chromedriver.storage.googleapis.com/$
 # Set environment variables
 ENV GOOGLE_CHROME_BIN=/usr/bin/google-chrome
 ENV CHROMEDRIVER_PATH=/usr/local/bin/chromedriver
+ENV PORT=5000
 
 # Set working directory
 WORKDIR /app
 
-# Copy and install Python dependencies
+# Install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy all project files (instead of missing "grok")
+# Copy project files
 COPY . /app
 
-# Expose port (Render expects 10000 by default)
-EXPOSE 10000
+# Expose port
+EXPOSE $PORT
 
-# Start the Flask app with Gunicorn
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:10000", "--workers", "1", "--timeout", "120"]
+# Start the Flask app (Gunicorn binds to Render's $PORT)
+CMD ["sh", "-c", "gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120"]
