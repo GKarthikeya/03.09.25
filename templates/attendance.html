@@ -72,4 +72,44 @@
         {% endif %}
     </div>
 </body>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Attendance Records</title>
+</head>
+<body>
+  <h1>Attendance Records</h1>
+  <table border="1">
+    <tr>
+      <th>S.No</th>
+      <th>Date</th>
+      <th>Period</th>
+      <th>Subject Code</th>
+      <th>Subject Name</th>
+      <th>Topic</th>
+      <th>Status</th>
+    </tr>
+    {% for row in records %}
+    <tr>
+      <td>{{ row.sno }}</td>
+      <td>{{ row.date }}</td>
+      <td>{{ row.period }}</td>
+      <td>{{ row.subject_code }}</td>
+      <td>{{ row.subject_name }}</td>
+      <td>{{ row.topic }}</td>
+      <td>{{ row.status }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+
+  <h2>Check Attendance by Date</h2>
+  <form action="/attendance/date" method="get">
+    <label>Enter Date (e.g. 03 Sep, 2025):</label>
+    <input type="text" name="date">
+    <button type="submit">Check</button>
+  </form>
+</body>
 </html>
+</html>
+
+
