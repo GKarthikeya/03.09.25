@@ -1,6 +1,5 @@
-# app.py
-
-from flask import Flask, render_template, request, redirect, url_for
+import os
+from flask import Flask, render_template, request
 from attendance_scraper import login_and_get_attendance
 
 app = Flask(__name__)
@@ -44,4 +43,5 @@ def attendance():
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=10000, debug=True)
+    port = int(os.environ.get("PORT", 5000))  # ✅ Use Render's dynamic port
+    app.run(host="0.0.0.0", port=port, debug=False)
