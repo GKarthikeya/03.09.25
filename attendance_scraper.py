@@ -1,132 +1,77 @@
-# attendance_scraper.py
+import streamlit as st
+from attendance_scraper import login_and_get_attendance
+import pandas as pd
+import matplotlib.pyplot as plt
 
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-import time
-import re
+st.set_page_config(page_title="Attendance Tracker", layout="wide")
 
-COLLEGE_LOGIN_URL = "https://samvidha.iare.ac.in/"
-ATTENDANCE_URL = "https://samvidha.iare.ac.in/home?action=course_content"
+st.title("📊 Attendance Tracker")
 
+# User Login Input
+username = st.text_input("Username")
+password = st.text_input("Password", type="password")
 
-def create_driver():
-    chrome_options = Options()
-    chrome_options.add_argument("--headless=new")  # ✅ Render requires headless
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--window-size=1920,1080")
+if st.button("Fetch Attendance"):
+    if not username or not password:
+        st.error("⚠️ Please enter both username and password")
+    else:
+        with st.spinner("Logging in and fetching data..."):
+            result = login_and_get_attendance(username, password)
 
-    # ✅ Use webdriver_manager so Render installs ChromeDriver dynamically
-    service = Service(ChromeDriverManager().install())
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-    return driver
+        if not result["overall"]["success"]:
+            st.error(result["overall"].get("message", "Login failed"))
+        else:
+            st.success(f"✅ Attendance fetched successfully!")
 
+            # ------------------------------
+            # Overall Stats
+            # ------------------------------
+            overall = result["overall"]
+            st.subheader("📌 Overall Attendance")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Present", overall["present"])
+            col2.metric("Absent", overall["absent"])
+            col3.metric("Percentage", f"{overall['percentage']}%")
 
-def calculate_attendance_percentage(rows):
-    result = {
-        "subjects": {},
-        "overall": {"present": 0, "absent": 0, "percentage": 0.0, "success": False}
-    }
+            # Pie Chart: Present vs Absent
+            fig1, ax1 = plt.subplots()
+            ax1.pie(
+                [overall["present"], overall["absent"]],
+                labels=["Present", "Absent"],
+                autopct="%1.1f%%",
+                startangle=90,
+                explode=(0.05, 0),
+            )
+            ax1.axis("equal")
+            st.pyplot(fig1)
 
-    current_course = None
-    total_present = 0
-    total_absent = 0
+            # ------------------------------
+            # Subject-wise Stats
+            # ------------------------------
+            st.subheader("📚 Subject-wise Attendance")
 
-    for row in rows:
-        text = row.text.strip().upper()
-        if not text or text.startswith("S.NO") or "TOPICS COVERED" in text:
-            continue
-
-        # Match subject course code + name
-        course_match = re.match(r"^(A[A-Z]+\d+)\s*[-:\s]+\s*(.+)$", text)
-        if course_match:
-            current_course = course_match.group(1)
-            course_name = course_match.group(2).strip()
-            result["subjects"][current_course] = {
-                "name": course_name,
-                "present": 0,
-                "absent": 0,
-                "percentage": 0.0,
-                "status": ""
-            }
-            continue
-
-        if current_course:
-            present_count = text.count("PRESENT")
-            absent_count = text.count("ABSENT")
-            result["subjects"][current_course]["present"] += present_count
-            result["subjects"][current_course]["absent"] += absent_count
-            total_present += present_count
-            total_absent += absent_count
-
-    # Subject-wise percentages
-    for sub in result["subjects"].values():
-        total = sub["present"] + sub["absent"]
-        if total > 0:
-            sub["percentage"] = round((sub["present"] / total) * 100, 2)
-            if sub["percentage"] < 65:
-                sub["status"] = "Shortage"
-            elif sub["percentage"] < 75:
-                sub["status"] = "Condonation"
-            else:
-                sub["status"] = ""
-
-    # Overall percentage
-    overall_total = total_present + total_absent
-    if overall_total > 0:
-        result["overall"] = {
-            "present": total_present,
-            "absent": total_absent,
-            "percentage": round((total_present / overall_total) * 100, 2),
-            "success": True
-        }
-
-    return result
-
-
-def login_and_get_attendance(username, password):
-    """Logs into Samvidha and fetches attendance report for given credentials"""
-    driver = create_driver()
-    try:
-        driver.get(COLLEGE_LOGIN_URL)
-        time.sleep(2)
-
-        # Fill login form
-        driver.find_element(By.ID, "txt_uname").send_keys(username)
-        driver.find_element(By.ID, "txt_pwd").send_keys(password)
-        driver.find_element(By.ID, "but_submit").click()
-        time.sleep(5)  # wait longer for login to process
-
-        # 🔍 Debugging info (goes to Render logs)
-        print("After login, URL:", driver.current_url)
-        print("Page source length:", len(driver.page_source))
-
-        # Check if still on login page (failed login)
-        if "login" in driver.current_url.lower() or "Invalid username or password" in driver.page_source:
-            return {
-                "overall": {
-                    "success": False,
-                    "message": "Login failed. Please check your credentials."
+            df = pd.DataFrame([
+                {
+                    "Course Code": code,
+                    "Course Name": sub["name"],
+                    "Present": sub["present"],
+                    "Absent": sub["absent"],
+                    "Percentage": sub["percentage"],
+                    "Status": sub["status"]
                 }
-            }
+                for code, sub in result["subjects"].items()
+            ])
 
-        # Navigate to attendance page
-        driver.get(ATTENDANCE_URL)
-        time.sleep(3)
+            st.dataframe(df, use_container_width=True)
 
-        rows = driver.find_elements(By.TAG_NAME, "tr")
-        return calculate_attendance_percentage(rows)
-
-    except Exception as e:
-        return {
-            "overall": {
-                "success": False,
-                "message": f"Error: {str(e)}"
-            }
-        }
-    finally:
-        driver.quit()
+            # Bar Chart: Subject-wise Percentages
+            st.subheader("📈 Attendance by Subject")
+            fig2, ax2 = plt.subplots(figsize=(8, 4))
+            ax2.bar(df["Course Code"], df["Percentage"], color="skyblue")
+            ax2.axhline(75, color="green", linestyle="--", label="Safe (75%)")
+            ax2.axhline(65, color="red", linestyle="--", label="Condonation (65%)")
+            ax2.set_ylabel("Percentage %")
+            ax2.set_xlabel("Course Code")
+            ax2.set_title("Subject-wise Attendance %")
+            ax2.legend()
+            st.pyplot(fig2)
