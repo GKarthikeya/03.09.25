@@ -3,3 +3,8 @@ selenium
 tabulate
 gunicorn
 webdriver-manager
+pandas
+matplotlib
+
+
+
